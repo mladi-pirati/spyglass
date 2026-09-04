@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:latest
+    container_name: spyglass_db
+    env_file:
+      - .env
+    ports:
+      - 5440:5432
+    volumes:
+      - spyglass_db_data:/var/lib/postgresql
+    restart: on-failure
+
+volumes:
+  spyglass_db_data:
