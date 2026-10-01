@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -44,7 +45,9 @@ export default async function AppLayout({
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="User menu" />}><UserIcon /></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel><span className="block truncate">{user.fullName}</span><span className="block truncate text-xs font-normal text-muted-foreground">@{user.username}</span></DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel><span className="block truncate">{user.fullName}</span><span className="block truncate text-xs font-normal text-muted-foreground">@{user.username}</span></DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <form action={logoutAction}><DropdownMenuItem render={<button type="submit" className="w-full" />}>Sign out</DropdownMenuItem></form>
               </DropdownMenuContent>
