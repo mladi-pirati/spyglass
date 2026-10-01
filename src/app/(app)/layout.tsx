@@ -1,7 +1,9 @@
+import Image from "next/image";
 import Link from "next/link";
-import { FileStackIcon, HistoryIcon, SearchIcon, Trash2Icon, UserIcon } from "lucide-react";
+import { HistoryIcon, SearchIcon, Trash2Icon, UserIcon } from "lucide-react";
 
 import { logoutAction } from "@/actions/auth";
+import folderIcon from "@/app/icon.svg";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,9 +30,7 @@ export default async function AppLayout({
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-[1800px] items-center gap-3 px-4 sm:px-6">
           <Link href="/" className="flex shrink-0 items-center gap-2 font-semibold tracking-tight">
-            <span className="grid size-9 place-items-center bg-primary text-primary-foreground">
-              <FileStackIcon className="size-5" />
-            </span>
+            <Image src={folderIcon} alt="" width={36} height={36} unoptimized className="size-9" />
             <span className="hidden sm:inline">Spyglass</span>
           </Link>
           <form action="/search" className="relative mx-auto hidden w-full max-w-2xl sm:block">

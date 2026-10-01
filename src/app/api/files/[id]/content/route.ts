@@ -35,7 +35,7 @@ function headersFor(item: NonNullable<Awaited<ReturnType<typeof resolveFile>>>, 
   if (input.contentRange) headers.set("Content-Range", input.contentRange);
   if (input.etag) headers.set("ETag", input.etag);
   if (input.lastModified) headers.set("Last-Modified", input.lastModified.toUTCString());
-  if (item.preview === "pdf" && !attachment) headers.set("Content-Security-Policy", "sandbox");
+  if (item.preview === "pdf" && !attachment) headers.set("Content-Security-Policy", "frame-ancestors 'none'");
   return headers;
 }
 

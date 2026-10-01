@@ -27,12 +27,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { createFolderAction, moveItemAction, renameItemAction, restoreItemAction, trashItemAction } from "@/actions/items";
+import { createFolderAction, getUploaderNameAction, moveItemAction, renameItemAction, restoreItemAction, trashItemAction } from "@/actions/items";
 import type { DriveItem } from "@/db/schema";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -74,6 +75,7 @@ export function MediaWorkspace({
   const [dialog, setDialog] = useState<"folder" | "rename" | "move" | null>(null);
   const [active, setActive] = useState<DriveItem | null>(null);
   const [details, setDetails] = useState<DriveItem | null>(null);
+  const [uploader, setUploader] = useState<{ itemId: string; name: string } | null>(null);
   const [value, setValue] = useState("");
   const [destination, setDestination] = useState<string>("");
   const [transfers, setTransfers] = useState<Transfer[]>([]);
@@ -91,6 +93,17 @@ export function MediaWorkspace({
     });
     return () => cancelAnimationFrame(frame);
   }, []);
+
+  const detailsFileId = details?.kind === "file" ? details.id : null;
+  const detailsUploaderId = details?.kind === "file" ? details.createdByHelmId : null;
+  useEffect(() => {
+    if (!detailsFileId || !detailsUploaderId) return;
+    let current = true;
+    void getUploaderNameAction(detailsFileId)
+      .then((name) => { if (current) setUploader({ itemId: detailsFileId, name: name ?? detailsUploaderId }); })
+      .catch(() => { if (current) setUploader({ itemId: detailsFileId, name: detailsUploaderId }); });
+    return () => { current = false; };
+  }, [detailsFileId, detailsUploaderId]);
 
   const visibleItems = useMemo(() => items
     .filter((item) => item.kind === "folder" || typeFilter === "all" || (typeFilter === "other" ? item.preview === "none" : item.preview === typeFilter))
@@ -278,7 +291,7 @@ export function MediaWorkspace({
       </Dialog>
 
       <Sheet open={details !== null} onOpenChange={(open) => { if (!open) setDetails(null); }}>
-        <SheetContent><SheetHeader><SheetTitle className="pr-8 break-words">{details?.name}</SheetTitle><SheetDescription>Item information</SheetDescription></SheetHeader>{details ? <><dl className="grid gap-4 px-4 text-sm"><Detail label="Path" value={search ? "Open the item to resolve its current path" : `/${[...breadcrumbs.map((entry) => entry.name), details.name].join("/")}`} /><Detail label="Type" value={details.kind === "folder" ? "Folder" : details.mimeType ?? "Unknown"} /><Detail label="Size" value={formatBytes(details.byteSize)} /><Detail label="Uploaded" value={formatDate(details.createdAt)} /><Detail label="Modified" value={formatDate(details.updatedAt)} /><Detail label="Helm actor ID" value={details.updatedByHelmId} /><Detail label="S3 key" value={details.storageKey ?? "—"} mono /></dl><div className="flex flex-wrap gap-2 px-4">{!trash ? <Button variant="outline" nativeButton={false} render={<Link href={details.kind === "folder" ? `/folders/${details.id}` : `/files/${details.id}`} />}>Open</Button> : null}{!trash && details.kind === "file" ? <Button variant="outline" nativeButton={false} render={<a href={`/api/files/${details.id}/content?download=1`} />}><DownloadIcon />Download</Button> : null}</div></> : null}</SheetContent>
+        <SheetContent><SheetHeader><SheetTitle className="pr-8 break-words">{details?.name}</SheetTitle><SheetDescription>Item information</SheetDescription></SheetHeader>{details ? <><dl className="grid gap-4 px-4 text-sm"><Detail label="Path" value={search ? "Open the item to resolve its current path" : `/${[...breadcrumbs.map((entry) => entry.name), details.name].join("/")}`} /><Detail label="Type" value={details.kind === "folder" ? "Folder" : details.mimeType ?? "Unknown"} /><Detail label="Size" value={formatBytes(details.byteSize)} /><Detail label="Uploaded" value={formatDate(details.createdAt)} />{details.kind === "file" ? <Detail label="Uploaded by" value={uploader?.itemId === details.id ? uploader.name : "Loading…"} /> : null}<Detail label="Modified" value={formatDate(details.updatedAt)} /><Detail label="Helm actor ID" value={details.updatedByHelmId} /><Detail label="S3 key" value={details.storageKey ?? "—"} mono /></dl><div className="flex flex-wrap gap-2 px-4">{!trash ? <Button variant="outline" nativeButton={false} render={<Link href={details.kind === "folder" ? `/folders/${details.id}` : `/files/${details.id}`} />}>Open</Button> : null}{!trash && details.kind === "file" ? <Button variant="outline" nativeButton={false} render={<a href={`/api/files/${details.id}/content?download=1`} />}><DownloadIcon />Download</Button> : null}</div></> : null}</SheetContent>
       </Sheet>
 
       {transfers.length ? <TransferPanel transfers={transfers} dismiss={() => setTransfers((current) => current.filter((transfer) => transfer.state === "uploading"))} /> : null}
@@ -291,17 +304,22 @@ export function MediaWorkspace({
 function ItemSection({ title, children }: { title: string; children: React.ReactNode }) { return <section><h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">{title}</h2>{children}</section>; }
 
 function FolderCard({ item, selected, onToggle, onDetails, onAction, trash }: CardProps) {
-  return <div className={`group relative flex items-center gap-3 rounded-xl border bg-card p-3 transition hover:border-primary/50 hover:shadow-sm ${selected ? "ring-2 ring-primary" : ""}`}><Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Select ${item.name}`} /><Link href={trash ? "#" : `/folders/${item.id}`} className="flex min-w-0 flex-1 items-center gap-3"><FolderIcon className="size-8 fill-primary/20 text-primary" /><span className="truncate text-sm font-medium">{item.name}</span></Link><ItemMenu item={item} onDetails={onDetails} onAction={onAction} trash={trash} /></div>;
+  return <ContextMenu><ContextMenuTrigger className={`group relative flex items-center gap-3 rounded-xl border bg-card p-3 transition hover:border-primary/50 hover:shadow-sm ${selected ? "ring-2 ring-primary" : ""}`}><Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Select ${item.name}`} /><Link href={trash ? "#" : `/folders/${item.id}`} className="flex min-w-0 flex-1 items-center gap-3"><FolderIcon className="size-8 fill-primary/20 text-primary" /><span className="truncate text-sm font-medium">{item.name}</span></Link><ItemMenu item={item} onDetails={onDetails} onAction={onAction} trash={trash} /></ContextMenuTrigger><ContextMenuContent><ItemMenuEntries item={item} onDetails={onDetails} onAction={onAction} trash={trash} context /></ContextMenuContent></ContextMenu>;
 }
 
 function FileCard({ item, selected, onToggle, onDetails, onAction, trash }: CardProps) {
-  return <div className={`group overflow-hidden rounded-xl border bg-card transition hover:border-primary/50 hover:shadow-sm ${selected ? "ring-2 ring-primary" : ""}`}><div className="relative aspect-[4/3] overflow-hidden bg-muted"><div className="absolute left-3 top-3 z-10"><Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Select ${item.name}`} /></div>{item.preview === "image" && !trash ? <img src={`/api/files/${item.id}/content`} alt="" loading="lazy" className="size-full object-cover" /> : <Link href={trash ? "#" : `/files/${item.id}`} className="grid size-full place-items-center">{iconFor(item, "size-12")}</Link>}<div className="absolute right-2 top-2"><ItemMenu item={item} onDetails={onDetails} onAction={onAction} trash={trash} /></div></div><Link href={trash ? "#" : `/files/${item.id}`} className="block p-3"><p className="truncate text-sm font-medium">{item.name}</p><p className="mt-1 text-xs text-muted-foreground">{formatBytes(item.byteSize)}</p></Link></div>;
+  return <ContextMenu><ContextMenuTrigger className={`group relative overflow-hidden rounded-xl border bg-card transition hover:border-primary/50 hover:shadow-sm ${selected ? "ring-2 ring-primary" : ""}`}>{!trash ? <Link href={`/files/${item.id}`} className="absolute inset-0 z-[1]" aria-label={`Open ${item.name}`} /> : null}<div className="relative aspect-[4/3] overflow-hidden bg-muted"><div className="absolute left-3 top-3 z-10"><Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Select ${item.name}`} /></div>{item.preview === "image" && !trash ? <img src={`/api/files/${item.id}/content`} alt="" loading="lazy" className="size-full object-cover" /> : <div className="grid size-full place-items-center">{iconFor(item, "size-12")}</div>}<div className="absolute right-2 top-2 z-10"><ItemMenu item={item} onDetails={onDetails} onAction={onAction} trash={trash} /></div></div><div className="p-3"><p className="truncate text-sm font-medium">{item.name}</p><p className="mt-1 text-xs text-muted-foreground">{formatBytes(item.byteSize)}</p></div></ContextMenuTrigger><ContextMenuContent><ItemMenuEntries item={item} onDetails={onDetails} onAction={onAction} trash={trash} context /></ContextMenuContent></ContextMenu>;
 }
 
 type CardProps = { item: DriveItem; selected: boolean; onToggle: () => void; onDetails: () => void; onAction: (action: string) => void; trash: boolean };
 
 function ItemMenu({ item, onDetails, onAction, trash }: { item: DriveItem; onDetails: () => void; onAction: (action: string) => void; trash: boolean }) {
-  return <DropdownMenu><DropdownMenuTrigger render={<Button size="icon-sm" variant="secondary" aria-label={`Actions for ${item.name}`} />}><MoreHorizontalIcon /></DropdownMenuTrigger><DropdownMenuContent align="end">{!trash && item.kind === "file" ? <><DropdownMenuItem render={<a href={`/api/files/${item.id}/content?download=1`} />}><DownloadIcon />Download</DropdownMenuItem><DropdownMenuItem onClick={() => onAction("replace")}><ReplaceIcon />Replace file</DropdownMenuItem></> : null}<DropdownMenuItem onClick={onDetails}><InfoIcon />Details</DropdownMenuItem>{trash ? <DropdownMenuItem onClick={() => onAction("restore")}><RotateCcwIcon />Restore</DropdownMenuItem> : <><DropdownMenuItem onClick={() => onAction("rename")}><PencilIcon />Rename</DropdownMenuItem><DropdownMenuItem onClick={() => onAction("move")}><MoveIcon />Move</DropdownMenuItem><DropdownMenuItem variant="destructive" onClick={() => onAction("trash")}><Trash2Icon />Move to trash</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu>;
+  return <DropdownMenu><DropdownMenuTrigger render={<Button size="icon-sm" variant="secondary" aria-label={`Actions for ${item.name}`} />}><MoreHorizontalIcon /></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48 min-w-48"><ItemMenuEntries item={item} onDetails={onDetails} onAction={onAction} trash={trash} /></DropdownMenuContent></DropdownMenu>;
+}
+
+function ItemMenuEntries({ item, onDetails, onAction, trash, context = false }: { item: DriveItem; onDetails: () => void; onAction: (action: string) => void; trash: boolean; context?: boolean }) {
+  const MenuItem = context ? ContextMenuItem : DropdownMenuItem;
+  return <>{!trash && item.kind === "file" ? <><MenuItem render={<a href={`/api/files/${item.id}/content?download=1`} />}><DownloadIcon />Download</MenuItem><MenuItem onClick={() => onAction("replace")}><ReplaceIcon />Replace file</MenuItem></> : null}<MenuItem onClick={onDetails}><InfoIcon />Details</MenuItem>{trash ? <MenuItem onClick={() => onAction("restore")}><RotateCcwIcon />Restore</MenuItem> : <><MenuItem onClick={() => onAction("rename")}><PencilIcon />Rename</MenuItem><MenuItem onClick={() => onAction("move")}><MoveIcon />Move</MenuItem><MenuItem variant="destructive" onClick={() => onAction("trash")}><Trash2Icon />Move to trash</MenuItem></>}</>;
 }
 
 function ItemTable({ items, selected, toggle, setDetails, onAction, trash }: { items: DriveItem[]; selected: Set<string>; toggle: (id: string) => void; setDetails: (item: DriveItem) => void; onAction: (action: string, item: DriveItem) => void; trash: boolean }) {

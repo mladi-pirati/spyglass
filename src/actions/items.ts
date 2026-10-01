@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireSpyglassAccess } from "@/lib/auth/access";
-import { createFolder, isUniqueViolation, moveItem, renameItem, restoreItem, trashItem } from "@/lib/drive";
+import { createFolder, getItem, isUniqueViolation, moveItem, renameItem, restoreItem, trashItem } from "@/lib/drive";
+import { getHelm } from "@/lib/helm";
 
 type ActionResult = { ok: true } | { ok: false; message: string };
 const optionalUuid = z.string().uuid().nullable();
@@ -58,4 +59,20 @@ export async function restoreItemAction(id: string): Promise<ActionResult> {
     revalidatePath("/"); revalidatePath("/trash");
     return { ok: true };
   } catch (error) { return { ok: false, message: messageFor(error) }; }
+}
+
+export async function getUploaderNameAction(id: string): Promise<string | null> {
+  const actor = await requireSpyglassAccess();
+  const item = await getItem(z.string().uuid().parse(id));
+  if (!item || item.kind !== "file") return null;
+
+  try {
+    const helm = await getHelm(actor.accessToken);
+    for await (const page of helm.user.members.paginate({ status: "all", limit: 100 })) {
+      const member = page.find((candidate) => candidate.id === item.createdByHelmId);
+      if (member) return `${member.firstName} ${member.lastName}`.trim() || `@${member.username}`;
+    }
+  } catch { /* Keep the recorded identity visible when Helm is unavailable. */ }
+
+  return item.createdByHelmId;
 }

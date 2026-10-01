@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ArrowLeftIcon, DownloadIcon, FileIcon } from "lucide-react";
 import { notFound } from "next/navigation";
 
+import { PdfPreview } from "@/components/library/pdf-preview";
+import { VideoPreview } from "@/components/library/video-preview";
 import { Button } from "@/components/ui/button";
 import { getBreadcrumbs, getItem } from "@/lib/drive";
 
@@ -22,11 +24,11 @@ export default async function FilePage({ params }: { params: Promise<{ id: strin
         <div className="min-w-0 flex-1"><h1 className="truncate text-lg font-semibold">{item.name}</h1><p className="text-sm text-muted-foreground">{item.mimeType} · {formatBytes(item.byteSize)}</p></div>
         <Button nativeButton={false} render={<a href={`${source}?download=1`} download />}><DownloadIcon />Download</Button>
       </div>
-      <div className="grid min-h-[70vh] place-items-center overflow-hidden border bg-black/95 p-4">
-        {item.preview === "image" ? <img src={source} alt={item.name} className="max-h-[80vh] max-w-full object-contain" /> : null}
-        {item.preview === "video" ? <video src={source} controls preload="metadata" className="max-h-[80vh] max-w-full" aria-label={item.name} /> : null}
-        {item.preview === "pdf" ? <iframe src={source} title={item.name} className="h-[80vh] w-full bg-white" sandbox="allow-same-origin" /> : null}
-        {item.preview === "none" ? <div className="grid max-w-md place-items-center gap-4 text-center text-white"><FileIcon className="size-16 text-primary" /><div><h2 className="text-xl font-semibold">Preview unavailable</h2><p className="mt-2 text-sm text-white/65">This file type can only be downloaded.</p></div></div> : null}
+      <div className="grid min-h-[70vh] min-w-0 place-items-center overflow-hidden rounded-xl border bg-card p-3 sm:p-5">
+        {item.preview === "image" ? <img src={source} alt={item.name} className="max-h-[80vh] max-w-full object-contain shadow-sm" /> : null}
+        {item.preview === "video" ? <VideoPreview src={source} name={item.name} mimeType={item.mimeType} /> : null}
+        {item.preview === "pdf" ? <PdfPreview src={source} name={item.name} downloadHref={`${source}?download=1`} /> : null}
+        {item.preview === "none" ? <div className="grid max-w-md place-items-center gap-4 p-6 text-center"><div className="grid size-20 place-items-center rounded-full bg-primary/10"><FileIcon className="size-10 text-primary" /></div><div><h2 className="text-xl font-semibold">Preview unavailable</h2><p className="mt-2 text-sm text-muted-foreground">This file type can only be downloaded.</p></div></div> : null}
       </div>
     </div>
   );

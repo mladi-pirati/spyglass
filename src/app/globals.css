@@ -128,3 +128,14 @@
     @apply font-mono;
   }
 }
+
+.spyglass-video {
+  --media-primary-color: #fff;
+  --media-secondary-color: rgb(255 255 255 / 18%);
+  --media-accent-color: var(--primary);
+}
+
+.spyglass-video video {
+  background: var(--muted);
+  object-fit: contain;
+}
