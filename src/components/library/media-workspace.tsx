@@ -199,23 +199,16 @@ export function MediaWorkspace({
       const completed = new Map<number, string>((session.parts ?? []).map((part) => [part.partNumber, part.etag]));
       const missing = Array.from({ length: session.partCount }, (_, index) => index + 1).filter((part) => !completed.has(part));
       let uploadedBytes = [...completed.keys()].reduce((sum, part) => sum + Math.min(session.partSize, file.size - (part - 1) * session.partSize), 0);
-      for (let offset = 0; offset < missing.length; offset += 20) {
-        const partNumbers = missing.slice(offset, offset + 20);
-        const signedResponse = await fetch(`/api/uploads/${session.id}/parts`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ partNumbers }) });
-        const signedBody = await signedResponse.json();
-        if (!signedResponse.ok) throw new Error(signedBody.error?.message ?? "Could not sign upload parts.");
-        await runWithConcurrency(signedBody.parts, 4, async ({ partNumber, url }: { partNumber: number; url: string }) => {
-          const start = (partNumber - 1) * session.partSize;
-          const chunk = file.slice(start, Math.min(start + session.partSize, file.size));
-          const response = await fetch(url, { method: "PUT", body: chunk });
-          if (!response.ok) throw new Error(`Part ${partNumber} failed.`);
-          const etag = response.headers.get("etag");
-          if (!etag) throw new Error("S3 did not expose the part ETag. Check bucket CORS.");
-          completed.set(partNumber, etag);
-          uploadedBytes += chunk.size;
-          setTransfers((current) => current.map((transfer) => transfer.id === localId ? { ...transfer, progress: Math.round(uploadedBytes / file.size * 100) } : transfer));
-        });
-      }
+      await runWithConcurrency(missing, 4, async (partNumber) => {
+        const start = (partNumber - 1) * session.partSize;
+        const chunk = file.slice(start, Math.min(start + session.partSize, file.size));
+        const response = await fetch(`/api/uploads/${session.id}/parts/${partNumber}`, { method: "PUT", body: chunk });
+        const body = await response.json() as { etag?: string; error?: { message?: string } };
+        if (!response.ok || !body.etag) throw new Error(body.error?.message ?? `Part ${partNumber} failed.`);
+        completed.set(partNumber, body.etag);
+        uploadedBytes += chunk.size;
+        setTransfers((current) => current.map((transfer) => transfer.id === localId ? { ...transfer, progress: Math.round(uploadedBytes / file.size * 100) } : transfer));
+      });
       const response = await fetch(`/api/uploads/${session.id}/complete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parts: [...completed].map(([partNumber, etag]) => ({ partNumber, etag })) }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message ?? "Could not complete upload.");

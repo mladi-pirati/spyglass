@@ -10,8 +10,8 @@ import {
   UploadPartCommand,
   type CompletedPart,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { fileTypeFromBuffer } from "file-type";
+import type { Readable } from "node:stream";
 
 const bucket = process.env.S3_BUCKET!;
 export const MULTIPART_PART_SIZE = 64 * 1024 * 1024;
@@ -22,8 +22,7 @@ export const s3 = globalForS3.spyglassS3 ?? new S3Client({
   region: process.env.S3_REGION!,
   endpoint: process.env.S3_ENDPOINT,
   forcePathStyle: true,
-  // The SDK's default ("WHEN_SUPPORTED") signs a CRC32 of the empty body into
-  // presigned UploadPart URLs, which S3 then rejects for every real part.
+  // Garage does not require the SDK's optional checksum headers.
   requestChecksumCalculation: "WHEN_REQUIRED",
   responseChecksumValidation: "WHEN_REQUIRED",
   credentials: {
@@ -43,15 +42,17 @@ export async function createMultipartUpload(key: string, contentType: string) {
   return result.UploadId;
 }
 
-export async function signUploadParts(key: string, uploadId: string, partNumbers: number[]) {
-  return Promise.all(partNumbers.map(async (partNumber) => ({
-    partNumber,
-    url: await getSignedUrl(
-      s3,
-      new UploadPartCommand({ Bucket: bucket, Key: key, UploadId: uploadId, PartNumber: partNumber }),
-      { expiresIn: 15 * 60 },
-    ),
-  })));
+export async function uploadPart(key: string, uploadId: string, partNumber: number, body: Readable, byteSize: number) {
+  const result = await s3.send(new UploadPartCommand({
+    Bucket: bucket,
+    Key: key,
+    UploadId: uploadId,
+    PartNumber: partNumber,
+    Body: body,
+    ContentLength: byteSize,
+  }));
+  if (!result.ETag) throw new Error("S3 did not return a part ETag.");
+  return result.ETag;
 }
 
 export async function listUploadedParts(key: string, uploadId: string) {

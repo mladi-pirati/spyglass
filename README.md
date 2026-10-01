@@ -28,23 +28,11 @@ bun run build
 
 ## Storage and uploads
 
-Files are uploaded directly to private S3 multipart uploads in 64 MiB parts. Spyglass signs each part for 15 minutes, caps files at 10 GB, and keeps resumable sessions for 24 hours. Reads always pass through the authenticated Next.js content route; the bucket must not be public.
+The browser sends 64 MiB parts to authenticated Spyglass routes. The app streams each part to private S3; S3 addresses and credentials never reach the browser. Uploads are capped at 10 GB and resumable sessions last 24 hours. Reads also pass through the authenticated Next.js content route; the bucket must not be public.
 
-Because the browser uploads parts directly, the bucket needs a CORS rule allowing `PUT` from the app origin and exposing `ETag`. Apply it once per bucket with `bun run s3:cors` (origins come from `S3_CORS_ORIGINS`, falling back to `AUTH_URL`). On Garage this requires a key with owner permission on the bucket (`garage bucket allow --owner --key <key> <bucket>`); otherwise it fails with `AccessDenied`.
+If starting an upload returns a 500, the response includes a reference ID. Find the matching `[uploads] start failed` entry in the **app** logs. Its `stage` identifies whether origin validation, destination lookup, S3 multipart creation, or database persistence failed; `code` and `httpStatusCode` provide the underlying error category. The worker does not handle upload creation.
 
-Configure bucket CORS for the Spyglass browser origin and expose `ETag`, which is required to complete multipart uploads. A minimal AWS-compatible policy is:
-
-```json
-[
-  {
-    "AllowedOrigins": ["https://spyglass.example.com"],
-    "AllowedMethods": ["PUT"],
-    "AllowedHeaders": ["*"],
-    "ExposeHeaders": ["ETag"],
-    "MaxAgeSeconds": 900
-  }
-]
-```
+The reverse proxy must allow request bodies of at least 64 MiB and keep upload requests open long enough for the app to stream them to S3. Its upload traffic and outbound S3 traffic both pass through the app server.
 
 Objects use readable upload-time keys such as `library/public_relations/siska_promo/campaign--1234abcd.jpg`. Folder and filename segments are lowercase ASCII, underscore-delimited, and capped at 80 readable characters. Renaming or moving an item changes database metadata only; existing S3 keys remain stable. Replacements get a new `--vN` key and the old object is queued for deletion after the database swap succeeds.
 

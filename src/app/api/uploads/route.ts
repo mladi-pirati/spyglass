@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { auditEvents, items, uploadSessions } from "@/db/schema";
 import { accessErrorResponse, requireSpyglassAccess, SpyglassAccessError } from "@/lib/auth/access";
 import { getFolderSegments, itemNameSchema } from "@/lib/drive";
+import { errorDiagnostics } from "@/lib/error-diagnostics";
 import { assertSameOrigin } from "@/lib/http";
 import { buildStorageKey } from "@/lib/storage-path";
 import { abortMultipartUpload, createMultipartUpload, MAX_FILE_SIZE, MULTIPART_PART_SIZE } from "@/lib/s3";
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
       if (duplicate) return Response.json({ error: { code: "name_conflict", message: "An item with that name already exists here." } }, { status: 409 });
     }
 
+    stage = "storage_key";
     storageKey = buildStorageKey({ folderSegments: await getFolderSegments(parentId), itemId, filename: name, generation });
     stage = "storage_create_multipart";
     uploadId = await createMultipartUpload(storageKey, parsed.data.contentType);
@@ -101,19 +103,6 @@ export async function POST(request: Request) {
     }
     return accessErrorResponse(error);
   }
-}
-
-function errorDiagnostics(error: unknown) {
-  const details = error && typeof error === "object" ? error as Record<string, unknown> : {};
-  const cause = details.cause && typeof details.cause === "object" ? details.cause as Record<string, unknown> : {};
-  const metadata = details.$metadata && typeof details.$metadata === "object" ? details.$metadata as Record<string, unknown> : {};
-  return {
-    name: typeof details.name === "string" ? details.name : "UnknownError",
-    code: typeof details.code === "string" ? details.code : undefined,
-    causeCode: typeof cause.code === "string" ? cause.code : undefined,
-    httpStatusCode: typeof metadata.httpStatusCode === "number" ? metadata.httpStatusCode : undefined,
-    storageRequestId: typeof metadata.requestId === "string" ? metadata.requestId : undefined,
-  };
 }
 
 function sqlLowerName(name: string) {

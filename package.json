@@ -11,12 +11,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "s3:cors": "bun scripts/configure-s3-cors.ts",
     "worker": "bun src/worker.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
-    "@aws-sdk/s3-request-presigner": "^3.1127.0",
     "@base-ui/react": "^1.8.0",
     "@mp/helm-sdk": "github:mladi-pirati/helm-sdk#v0.2.0",
     "class-variance-authority": "^0.7.1",
