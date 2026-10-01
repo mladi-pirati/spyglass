@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { auditEvents, items, uploadSessions } from "@/db/schema";
-import { accessErrorResponse, requireSpyglassAccess } from "@/lib/auth/access";
+import { accessErrorResponse, requireSpyglassAccess, SpyglassAccessError } from "@/lib/auth/access";
 import { getFolderSegments, itemNameSchema } from "@/lib/drive";
 import { assertSameOrigin } from "@/lib/http";
 import { buildStorageKey } from "@/lib/storage-path";
@@ -21,11 +21,15 @@ const inputSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const requestId = crypto.randomUUID();
+  let stage = "origin_check";
   let uploadId: string | undefined;
   let storageKey: string | undefined;
   try {
     assertSameOrigin(request);
+    stage = "access_check";
     const actor = await requireSpyglassAccess();
+    stage = "request_parse";
     const parsed = inputSchema.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: { code: "invalid_request", message: parsed.error.issues[0]?.message } }, { status: 422 });
 
@@ -35,6 +39,7 @@ export async function POST(request: Request) {
     let generation = 1;
     const intent = parsed.data.replaceItemId ? "replace" as const : "new" as const;
 
+    stage = "destination_lookup";
     if (parsed.data.replaceItemId) {
       const current = await db.query.items.findFirst({ where: and(eq(items.id, parsed.data.replaceItemId), eq(items.kind, "file"), isNull(items.trashedAt)) });
       if (!current) return Response.json({ error: { code: "not_found", message: "File was not found." } }, { status: 404 });
@@ -55,8 +60,10 @@ export async function POST(request: Request) {
     }
 
     storageKey = buildStorageKey({ folderSegments: await getFolderSegments(parentId), itemId, filename: name, generation });
+    stage = "storage_create_multipart";
     uploadId = await createMultipartUpload(storageKey, parsed.data.contentType);
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    stage = "session_persist";
     const [session] = await db.transaction(async (tx) => {
       const created = await tx.insert(uploadSessions).values({
         itemId, parentId, intent, requestedName: name,
@@ -78,9 +85,35 @@ export async function POST(request: Request) {
       expiresAt: session.expiresAt.toISOString(), fingerprint: session.fingerprint,
     }, { status: 201 });
   } catch (error) {
-    if (uploadId && storageKey) await abortMultipartUpload(storageKey, uploadId).catch(() => undefined);
+    if (!(error instanceof SpyglassAccessError)) {
+      console.error("[uploads] start failed", { requestId, stage, ...errorDiagnostics(error) });
+    }
+    if (uploadId && storageKey) {
+      await abortMultipartUpload(storageKey, uploadId).catch((abortError) => {
+        console.error("[uploads] cleanup failed", { requestId, stage: "storage_abort_multipart", ...errorDiagnostics(abortError) });
+      });
+    }
+    if (!(error instanceof SpyglassAccessError)) {
+      return Response.json(
+        { error: { code: "internal_error", message: `Unexpected server error. Reference: ${requestId}.` } },
+        { status: 500, headers: { "X-Request-ID": requestId } },
+      );
+    }
     return accessErrorResponse(error);
   }
+}
+
+function errorDiagnostics(error: unknown) {
+  const details = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  const cause = details.cause && typeof details.cause === "object" ? details.cause as Record<string, unknown> : {};
+  const metadata = details.$metadata && typeof details.$metadata === "object" ? details.$metadata as Record<string, unknown> : {};
+  return {
+    name: typeof details.name === "string" ? details.name : "UnknownError",
+    code: typeof details.code === "string" ? details.code : undefined,
+    causeCode: typeof cause.code === "string" ? cause.code : undefined,
+    httpStatusCode: typeof metadata.httpStatusCode === "number" ? metadata.httpStatusCode : undefined,
+    storageRequestId: typeof metadata.requestId === "string" ? metadata.requestId : undefined,
+  };
 }
 
 function sqlLowerName(name: string) {
