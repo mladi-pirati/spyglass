@@ -4,6 +4,7 @@ import { ArrowLeftIcon, DownloadIcon, FileIcon } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { PdfPreview } from "@/components/library/pdf-preview";
+import { AudioPreview } from "@/components/library/audio-preview";
 import { VideoPreview } from "@/components/library/video-preview";
 import { Button } from "@/components/ui/button";
 import { getBreadcrumbs, getItem } from "@/lib/drive";
@@ -27,6 +28,7 @@ export default async function FilePage({ params }: { params: Promise<{ id: strin
       <div className="grid min-h-[70vh] min-w-0 place-items-center overflow-hidden rounded-xl border bg-card p-3 sm:p-5">
         {item.preview === "image" ? <img src={source} alt={item.name} className="max-h-[80vh] max-w-full object-contain shadow-sm" /> : null}
         {item.preview === "video" ? <VideoPreview src={source} name={item.name} mimeType={item.mimeType} /> : null}
+        {item.preview === "audio" ? <AudioPreview src={source} name={item.name} /> : null}
         {item.preview === "pdf" ? <PdfPreview src={source} name={item.name} downloadHref={`${source}?download=1`} /> : null}
         {item.preview === "none" ? <div className="grid max-w-md place-items-center gap-4 p-6 text-center"><div className="grid size-20 place-items-center rounded-full bg-primary/10"><FileIcon className="size-10 text-primary" /></div><div><h2 className="text-xl font-semibold">Preview unavailable</h2><p className="mt-2 text-sm text-muted-foreground">This file type can only be downloaded.</p></div></div> : null}
       </div>

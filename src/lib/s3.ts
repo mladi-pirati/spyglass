@@ -100,9 +100,10 @@ export async function inspectStoredObject(key: string) {
   return { byteSize: head.ContentLength ?? 0, etag: head.ETag ?? null, mimeType, preview };
 }
 
-export function classifyPreview(mimeType: string): "image" | "video" | "pdf" | "none" {
+export function classifyPreview(mimeType: string): "image" | "video" | "audio" | "pdf" | "none" {
   if (["image/jpeg", "image/png", "image/gif", "image/webp", "image/avif", "image/bmp"].includes(mimeType)) return "image";
-  if (["video/mp4", "video/webm", "video/ogg"].includes(mimeType)) return "video";
+  if (["video/mp4", "video/webm", "video/ogg", "video/quicktime"].includes(mimeType)) return "video";
+  if (["audio/mpeg", "audio/mp4", "audio/aac", "audio/wav", "audio/ogg", "audio/ogg; codecs=opus", "audio/webm", "audio/flac", "audio/x-flac"].includes(mimeType)) return "audio";
   if (mimeType === "application/pdf") return "pdf";
   return "none";
 }

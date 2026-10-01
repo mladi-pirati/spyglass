@@ -12,6 +12,7 @@ import {
   FileTextIcon,
   FilmIcon,
   FolderIcon,
+  Music2Icon,
   Grid2X2Icon,
   InfoIcon,
   ListIcon,
@@ -69,7 +70,7 @@ export function MediaWorkspace({
   const fileInput = useRef<HTMLInputElement>(null);
   const replacementInput = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [typeFilter, setTypeFilter] = useState<"all" | "image" | "video" | "pdf" | "other">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "image" | "video" | "audio" | "pdf" | "other">("all");
   const [sort, setSort] = useState<"name" | "newest" | "oldest">("name");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialog, setDialog] = useState<"folder" | "rename" | "move" | null>(null);
@@ -243,7 +244,7 @@ export function MediaWorkspace({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div><h1 className="text-2xl font-semibold tracking-tight">{title}</h1><p className="mt-1 text-sm text-muted-foreground">{items.length} {items.length === 1 ? "item" : "items"}</p></div>
           <div className="flex items-center gap-2">
-            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)} className="hidden h-9 rounded-lg border bg-background px-2 text-sm sm:block" aria-label="Filter file type"><option value="all">All types</option><option value="image">Images</option><option value="video">Videos</option><option value="pdf">PDFs</option><option value="other">Other</option></select>
+            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)} className="hidden h-9 rounded-lg border bg-background px-2 text-sm sm:block" aria-label="Filter file type"><option value="all">All types</option><option value="image">Images</option><option value="video">Videos</option><option value="audio">Audio</option><option value="pdf">PDFs</option><option value="other">Other</option></select>
             <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="hidden h-9 rounded-lg border bg-background px-2 text-sm md:block" aria-label="Sort items"><option value="name">Name</option><option value="newest">Newest</option><option value="oldest">Oldest</option></select>
             {!trash && !search ? <>
               <Button variant="outline" onClick={() => { setValue(""); setDialog("folder"); }}><PlusIcon />New folder</Button>
@@ -325,7 +326,7 @@ function TransferPanel({ transfers, dismiss }: { transfers: Transfer[]; dismiss:
 
 function Detail({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) { return <div><dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt><dd className={`mt-1 break-all ${mono ? "font-mono text-xs" : ""}`}>{value}</dd></div>; }
 
-function iconFor(item: DriveItem, className: string) { if (item.kind === "folder") return <FolderIcon className={`${className} text-primary`} />; if (item.preview === "image") return <FileImageIcon className={`${className} text-sky-500`} />; if (item.preview === "video") return <FilmIcon className={`${className} text-violet-500`} />; if (item.preview === "pdf") return <FileTextIcon className={`${className} text-red-500`} />; return <FileIcon className={`${className} text-muted-foreground`} />; }
+function iconFor(item: DriveItem, className: string) { if (item.kind === "folder") return <FolderIcon className={`${className} text-primary`} />; if (item.preview === "image") return <FileImageIcon className={`${className} text-sky-500`} />; if (item.preview === "video") return <FilmIcon className={`${className} text-violet-500`} />; if (item.preview === "audio") return <Music2Icon className={`${className} text-emerald-500`} />; if (item.preview === "pdf") return <FileTextIcon className={`${className} text-red-500`} />; return <FileIcon className={`${className} text-muted-foreground`} />; }
 
 function formatBytes(value: number | null) { if (value === null) return "—"; const units = ["B", "KB", "MB", "GB"]; let size = value; let unit = 0; while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1; } return `${size.toFixed(unit ? 1 : 0)} ${units[unit]}`; }
 function formatDate(value: Date) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }

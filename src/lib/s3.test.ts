@@ -8,9 +8,14 @@ describe("S3 media policy", () => {
     expect(MAX_FILE_SIZE).toBe(10 * 1024 * 1024 * 1024);
   });
 
-  test("previews only explicitly supported browser-native media", () => {
+  test("classifies common playable media and keeps unrelated files download-only", () => {
     expect(classifyPreview("image/jpeg")).toBe("image");
     expect(classifyPreview("video/mp4")).toBe("video");
+    expect(classifyPreview("video/quicktime")).toBe("video");
+    expect(classifyPreview("audio/mpeg")).toBe("audio");
+    expect(classifyPreview("audio/mp4")).toBe("audio");
+    expect(classifyPreview("audio/wav")).toBe("audio");
+    expect(classifyPreview("audio/ogg; codecs=opus")).toBe("audio");
     expect(classifyPreview("application/pdf")).toBe("pdf");
     expect(classifyPreview("image/svg+xml")).toBe("none");
     expect(classifyPreview("application/zip")).toBe("none");

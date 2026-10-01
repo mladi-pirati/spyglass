@@ -15,7 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const itemKind = pgEnum("item_kind", ["file", "folder"]);
-export const previewKind = pgEnum("preview_kind", ["image", "video", "pdf", "none"]);
+export const previewKind = pgEnum("preview_kind", ["image", "video", "audio", "pdf", "none"]);
 export const uploadIntent = pgEnum("upload_intent", ["new", "replace"]);
 export const uploadStatus = pgEnum("upload_status", ["pending", "completed", "aborted", "expired"]);
 export const deletionStatus = pgEnum("deletion_status", ["pending", "processing", "completed", "failed"]);
